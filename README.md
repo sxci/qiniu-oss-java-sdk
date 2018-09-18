@@ -1,5 +1,13 @@
 # qiniu-oss-java-sdk
 
+```
+git clone git@github.com:sxci/qiniu-oss-java-sdk.git
+cd qiniu-oss-java-sdk
+./gradlew clean
+./gradlew jar
+ls build/libs/
+```
+
 执行 `./gradlew clean` 清理编译的缓存；
 
 执行 `./gradlew jar` 编译并生成 jar 文件，保存在 `./build/libs/` 下；
