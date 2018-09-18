@@ -20,7 +20,6 @@ server.pid
 /dist/
 .cache
 .gradle/
-gradle/
 build/
 out/
 
