@@ -589,7 +589,6 @@ public class QiniuOSSClient implements OSS {
         try {
             com.qiniu.storage.model.BucketInfo qinfo = getBucketManager().getBucketInfo(bucketName);
             BucketWebsiteResult ret = new BucketWebsiteResult();
-            System.out.println(qinfo);
             if (qinfo.getNoIndexPage() == IndexPageType.HAS.getType()) {
                 ret.setErrorDocument("error-404");
                 ret.setIndexDocument("index.html");
