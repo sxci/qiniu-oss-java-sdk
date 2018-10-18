@@ -37,6 +37,7 @@ import com.qiniu.storage.model.FileInfo;
 import com.qiniu.storage.model.FileListing;
 import com.qiniu.storage.model.IndexPageType;
 import com.qiniu.util.Auth;
+import com.qiniu.util.StringUtils;
 import okhttp3.Authenticator;
 import okhttp3.*;
 
@@ -127,10 +128,22 @@ public class QiniuOSSClient implements OSS {
     @Override
     public void deleteBucket(String bucketName) throws OSSException, ClientException {
         try {
-            getBucketManager().deleteBucket(bucketName);
+            if (isEmptyBucket(bucketName)) {
+                getBucketManager().deleteBucket(bucketName);
+            } else {
+                throw new OSSException("BucketNotEmpty: " + bucketName);
+            }
         } catch (QiniuException e) {
+            if (e.code() == 612) {
+                throw new OSSException("NoSuchBucket: " + bucketName);
+            }
             throwAliException(e);
         }
+    }
+
+    public boolean isEmptyBucket(String bucketName) throws OSSException, ClientException {
+        ObjectListing objs = listObjects(new ListObjectsRequest(bucketName, null, null, null, 2));
+        return objs.getObjectSummaries().size() == 0;
     }
 
     @Override
@@ -189,10 +202,27 @@ public class QiniuOSSClient implements OSS {
     }
 
     @Override
-    public DeleteObjectsResult deleteObjects(DeleteObjectsRequest deleteObjectsRequest)
+    public DeleteObjectsResult deleteObjects(DeleteObjectsRequest req)
             throws OSSException, ClientException {
-        // 不要求实现，需要的话，可以考虑 batch 删除
-        throw new UnsupportedOperationException(unsupportedMsg);
+        List<String> keys = req.getKeys();
+        if (keys.size() == 0) {
+            return new DeleteObjectsResult();
+        }
+        BucketManager.BatchOperations opt = new BucketManager.BatchOperations();
+        for(String key: keys) {
+            opt.addDeleteOp(req.getBucketName(), key);
+        }
+        try {
+            Response res = getBucketManager().batch(opt);
+            DeleteObjectsResult ret = new DeleteObjectsResult();
+            // TODO 组装响应结果 // 不要求实现，只实现了删除功能，没有组装响应结果
+            return  ret;
+        } catch (QiniuException e) {
+            throwAliException(e);
+            return null;
+        }
+//        // 不要求实现，需要的话，可以考虑 batch 删除
+//        throw new UnsupportedOperationException(unsupportedMsg);
     }
 
 
@@ -336,6 +366,7 @@ public class QiniuOSSClient implements OSS {
             while ((bytesRead = ossObject.getObjectContent().read(buffer)) != -1) {
                 outputStream.write(buffer, 0, bytesRead);
             }
+            outputStream.flush();
 
             // TODO 没有校验 etag
             return ossObject.getObjectMetadata();
@@ -410,9 +441,9 @@ public class QiniuOSSClient implements OSS {
 
             return objs;
         } catch (QiniuException e) {
-            e.printStackTrace();
+            throwAliException(e);
+            return null;
         }
-        return null;
     }
 
 
@@ -534,8 +565,17 @@ public class QiniuOSSClient implements OSS {
 
     @Override
     public void setBucketWebsite(SetBucketWebsiteRequest request) throws OSSException, ClientException {
+        if (StringUtils.isNullOrEmpty(request.getIndexDocument()) &&
+                StringUtils.isNullOrEmpty(request.getErrorDocument())) {
+            try {
+                getBucketManager().setIndexPage(request.getBucketName(), IndexPageType.NO);
+            } catch (QiniuException e) {
+                throwAliException(e);
+            }
+            return;
+        }
         if (!"index.html".equals(request.getIndexDocument()) || !"error-404".equals(request.getErrorDocument())) {
-            throw new ClientException("indexDocument must be index.html, errorDocument must be error-404");
+            throw new ClientException("indexDocument must be index.html or '', errorDocument must be error-404 or ''");
         }
         try {
             getBucketManager().setIndexPage(request.getBucketName(), IndexPageType.HAS);
@@ -549,6 +589,7 @@ public class QiniuOSSClient implements OSS {
         try {
             com.qiniu.storage.model.BucketInfo qinfo = getBucketManager().getBucketInfo(bucketName);
             BucketWebsiteResult ret = new BucketWebsiteResult();
+            System.out.println(qinfo);
             if (qinfo.getNoIndexPage() == IndexPageType.HAS.getType()) {
                 ret.setErrorDocument("error-404");
                 ret.setIndexDocument("index.html");
@@ -1480,20 +1521,20 @@ public class QiniuOSSClient implements OSS {
     }
 
     class DomainCache extends LinkedHashMap<String, Host> {
-        private int size;
+        private int limit;
 
         public DomainCache() {
             this(256);
         }
 
-        public DomainCache(int size) {
-            super(size, 1.0f, true);
-            this.size = size;
+        public DomainCache(int limit) {
+            super(limit, 1.0f, true);
+            this.limit = limit;
         }
 
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, Host> eldest) {
-            return this.size() > this.size;
+            return this.size() > this.limit;
         }
     }
 
