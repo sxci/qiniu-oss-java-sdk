@@ -27,17 +27,15 @@ public class QiniuOSSTest {
 
     private void init0() {
         Configuration.defaultUcHost = "uc-qos.tc2.echosoul.cn";
-//        Configuration.defaultApiHost = "";
+        Configuration.defaultApiHost = "api-qos.tc2.echosoul.cn";
         Configuration.defaultRsHost = "rs-qos.tc2.echosoul.cn";
 
         Zone zone = new Zone.Builder(Zone.zone0()).region("z0").upHttp("http://up-qos.tc2.echosoul.cn").
                 upBackupHttp("http://up-qos.tc2.echosoul.cn").iovipHttp("http://io-qos.tc2.echosoul.cn").
                 rsHttp("http://rs-qos.tc2.echosoul.cn").rsfHttp("http://rsf-qos.tc2.echosoul.cn").build();
         Configuration config = new Configuration(zone);
-        config.useHttpsDomains = false;
+        config.useHttpsDomains = false; // 使用 http ，方便必要时 http 抓包查看请求响应信息
 
-
-        //valid ak & sk
         String testAccessKey = System.getenv("QINIU_ACCESS_KEY");
         String testSecretKey = System.getenv("QINIU_SECRET_KEY");
 
@@ -51,7 +49,8 @@ public class QiniuOSSTest {
         String testSecretKey = System.getenv("QINIU_SECRET_KEY");
 
         Configuration config = new Configuration(Zone.zone0());
-        config.useHttpsDomains = false;
+        config.useHttpsDomains = false;// 使用 http ，方便必要时 http 抓包查看请求响应信息
+        
         qiniuOSSClient = new QiniuOSSClient(testAccessKey, testSecretKey, config);
     }
 
@@ -64,40 +63,6 @@ public class QiniuOSSTest {
     public void tearDown() {
         println("\n\ntearDown");
         clean();
-    }
-
-    @Test
-    public void clean() {
-        List<Bucket> bkts = qiniuOSSClient.listBuckets();
-        for (Bucket bkt : bkts) {
-            if (bkt.getName().startsWith(BUCKET_NAME_PREFIX)) {
-                println(bkt.getName() + ",  delAllObjs");
-                delAllObjs(bkt.getName());
-                delAllObjs(bkt.getName());
-                delAllObjs(bkt.getName());
-                println("deleteBucket: " + bkt.getName());
-                try {
-                    qiniuOSSClient.deleteBucket(bkt.getName());
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
-
-
-    private void delAllObjs(String bkt) {
-        ObjectListing objs = qiniuOSSClient.listObjects(bkt);
-        DeleteObjectsRequest dels = new DeleteObjectsRequest(bkt);
-        List<String> keys = new ArrayList<String>();
-        if (objs.getObjectSummaries().size() == 0) {
-            return;
-        }
-        for (OSSObjectSummary obj : objs.getObjectSummaries()) {
-            keys.add(obj.getKey());
-        }
-        dels.setKeys(keys);
-        qiniuOSSClient.deleteObjects(dels);
     }
 
 
@@ -368,6 +333,40 @@ public class QiniuOSSTest {
         for (Bucket b : bkts) {
             println(b.getName());
         }
+    }
+
+    @Test
+    public void clean() {
+        List<Bucket> bkts = qiniuOSSClient.listBuckets();
+        for (Bucket bkt : bkts) {
+            if (bkt.getName().startsWith(BUCKET_NAME_PREFIX)) {
+                println(bkt.getName() + ",  delAllObjs");
+                delAllObjs(bkt.getName());
+                delAllObjs(bkt.getName());
+                delAllObjs(bkt.getName());
+                println("deleteBucket: " + bkt.getName());
+                try {
+                    qiniuOSSClient.deleteBucket(bkt.getName());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+
+    private void delAllObjs(String bkt) {
+        ObjectListing objs = qiniuOSSClient.listObjects(bkt);
+        DeleteObjectsRequest dels = new DeleteObjectsRequest(bkt);
+        List<String> keys = new ArrayList<String>();
+        if (objs.getObjectSummaries().size() == 0) {
+            return;
+        }
+        for (OSSObjectSummary obj : objs.getObjectSummaries()) {
+            keys.add(obj.getKey());
+        }
+        dels.setKeys(keys);
+        qiniuOSSClient.deleteObjects(dels);
     }
 
 

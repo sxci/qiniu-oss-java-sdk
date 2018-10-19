@@ -209,14 +209,14 @@ public class QiniuOSSClient implements OSS {
             return new DeleteObjectsResult();
         }
         BucketManager.BatchOperations opt = new BucketManager.BatchOperations();
-        for(String key: keys) {
+        for (String key : keys) {
             opt.addDeleteOp(req.getBucketName(), key);
         }
         try {
             Response res = getBucketManager().batch(opt);
             DeleteObjectsResult ret = new DeleteObjectsResult();
             // TODO 组装响应结果 // 不要求实现，只实现了删除功能，没有组装响应结果
-            return  ret;
+            return ret;
         } catch (QiniuException e) {
             throwAliException(e);
             return null;
@@ -227,8 +227,8 @@ public class QiniuOSSClient implements OSS {
 
 
     @Override
-        public PutObjectResult putObject(String bucketName, String key, InputStream input)
-                throws OSSException, ClientException {
+    public PutObjectResult putObject(String bucketName, String key, InputStream input)
+            throws OSSException, ClientException {
         // 不要求实现
         throw new UnsupportedOperationException(unsupportedMsg);
     }
@@ -459,7 +459,7 @@ public class QiniuOSSClient implements OSS {
             throw new ClientException("no domain on the bucket " + bucketName, e);
         }
         String url = "http://" + domain + "/" + HttpUtil.urlEncode(key, "UTF-8");
-        String signedUrl = auth.privateDownloadUrlWithDeadline(url, expiration.getTime()/1000);
+        String signedUrl = auth.privateDownloadUrlWithDeadline(url, expiration.getTime() / 1000);
         try {
             return new URL(signedUrl);
         } catch (MalformedURLException e) {
@@ -618,7 +618,6 @@ public class QiniuOSSClient implements OSS {
     public void deleteBucketWebsite(GenericRequest genericRequest) throws OSSException, ClientException {
         deleteBucketWebsite(genericRequest.getBucketName());
     }
-
 
 
     ///////////////////////////////////
