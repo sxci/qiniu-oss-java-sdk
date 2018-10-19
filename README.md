@@ -16,6 +16,8 @@ ls build/libs/
 
 将生成的 jar 文件放入目标项目中。
 
+注：需同时加入阿里 OSS sdk 和 七牛上传 sdk，及其依赖项。即： `com.aliyun.oss:aliyun-sdk-oss:3.3.+` 和 `com.qiniu:qiniu-java-sdk:7.2.17` 。
+
 初始化
 ```
 // qiniuOSSClient 初始化之后，可一直使用
