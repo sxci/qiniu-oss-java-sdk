@@ -36,8 +36,8 @@ qiniuOSSClient = new QiniuOSSClient(accessKey, secretKey, config);
 
 运行测试：
 测试代码在 `QiniuOSSTest.java` 文件中。
-在 `QiniuOSSTest.java` 文件中选择初始化类型。在 `setUp` 方法中选择运行 `init0()` 或 `init1()`，在对应的方法中设置好 `ak`、`sk`。
-其中选择 `init0()` 表示使用七牛公网服务，选择 `init1()` 表示运行一特定私有存储部署。
+在 `QiniuOSSTest.java` 文件中选择初始化类型。在 `setUp` 方法中选择运行 `initPublic()` 或 `initPrivate()`，在对应的方法中设置好 `ak`、`sk`。
+其中选择 `initPublic()` 表示使用七牛公网服务，选择 `initPrivate()` 表示运行一特定私有存储部署。
 测试命令：`./gradlew test -i --tests com.aliyun.oss.QiniuOSSTest.testQiniu` 。
 执行命令后 `setUp` 方法会自动运行，进而运行初始化方法；实际测试代码在 `testQiniu` 方法中；测试结束 `tearDown` 方法也会自动运行。
 

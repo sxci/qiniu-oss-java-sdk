@@ -20,12 +20,12 @@ import java.util.List;
 
 
 public class QiniuOSSTest {
-    protected static final String BUCKET_NAME_PREFIX = "oss-java-sdk-";
+    protected static final String BUCKET_NAME_PREFIX = "oss-java-sdk_";
 
     OkHttpClient client = new OkHttpClient();
     QiniuOSSClient qiniuOSSClient;
 
-    private void init0() {
+    private void initPrivate() {
         Configuration.defaultUcHost = "uc-qos.tc2.echosoul.cn";
         Configuration.defaultApiHost = "api-qos.tc2.echosoul.cn";
         Configuration.defaultRsHost = "rs-qos.tc2.echosoul.cn";
@@ -38,25 +38,27 @@ public class QiniuOSSTest {
 
         String testAccessKey = System.getenv("QINIU_ACCESS_KEY");
         String testSecretKey = System.getenv("QINIU_SECRET_KEY");
+        println(testAccessKey);
 
         qiniuOSSClient = new QiniuOSSClient(testAccessKey, testSecretKey, config);
     }
 
 
-    private void init1() {
-        //valid ak & sk
+    private void initPublic() {
         String testAccessKey = System.getenv("QINIU_ACCESS_KEY");
         String testSecretKey = System.getenv("QINIU_SECRET_KEY");
+        println(testAccessKey);
 
         Configuration config = new Configuration(Zone.zone0());
-        config.useHttpsDomains = false;// 使用 http ，方便必要时 http 抓包查看请求响应信息
-        
+        config.useHttpsDomains = false; // 使用 http ，方便必要时 http 抓包查看请求响应信息
+
         qiniuOSSClient = new QiniuOSSClient(testAccessKey, testSecretKey, config);
     }
 
     @Before
     public void setUp() throws Exception {
-        init1();
+        initPublic();
+//        initPrivate();
     }
 
     @After
@@ -97,9 +99,26 @@ public class QiniuOSSTest {
         println(6);
         uploadFiles(files, bktNames);
 
+//        println("6 - 10");
+//        showUrls(bktNames);
+
+        //
+        try {
+            Thread.sleep(1000 * 5);
+        } catch (InterruptedException e) {
+            try {
+                Thread.sleep(1000 * 5);
+            } catch (InterruptedException e1) {
+                e1.printStackTrace();
+            }
+        }
+
         // 7
         println(7);
         showAndCheckFiles(files, bktNames);
+
+        println("7 - 10");
+        showUrls(bktNames);
 
         // 8
         println(8);
@@ -227,7 +246,7 @@ public class QiniuOSSTest {
 
     private void uploadFiles(List<File> files, List<String> bktNames) {
         for (String bkt : bktNames) {
-            println("");
+            println(" 上传 ");
             for (File f : files) {
                 String key = f.getName();
                 PutObjectResult ret = qiniuOSSClient.putObject(bkt, key, f);
@@ -242,7 +261,6 @@ public class QiniuOSSTest {
             println(bkt);
             ObjectListing all = qiniuOSSClient.listObjects(bkt);
             List<OSSObjectSummary> objs = all.getObjectSummaries();
-            List<String> randomKeys = new ArrayList<>(7);
             for (OSSObjectSummary o : objs) {
                 println("\t key: " + o.getKey() + ", hash: " + o.getETag() + ", type: " + o.getStorageClass());
                 Assert.assertTrue(" 文件名在上传文件列表中 ", hasFile(o, files));
@@ -264,10 +282,16 @@ public class QiniuOSSTest {
 
     // 空间数为 5 ，文件数为 10 ，下标不会越界
     private void delPartFile(List<File> files, List<String> bktNames) {
+        println("\n\n");
         for (int i = 0; i < bktNames.size(); i++) {
+            print("deleteObject: " + bktNames.get(i) + ":" + files.get(i).getName());
             qiniuOSSClient.deleteObject(bktNames.get(i), files.get(i).getName());
+            println("\tsuccessed.");
+            print("deleteObject: " + bktNames.get(i) + ":" + files.get(i + 1).getName());
             qiniuOSSClient.deleteObject(bktNames.get(i), files.get(i + 1).getName());
+            println("\tsuccessed.");
         }
+        println("\n");
     }
 
 
@@ -278,7 +302,6 @@ public class QiniuOSSTest {
             println(bkt);
             ObjectListing all = qiniuOSSClient.listObjects(bkt);
             List<OSSObjectSummary> objs = all.getObjectSummaries();
-            List<String> randomKeys = new ArrayList<>(7);
             for (OSSObjectSummary o : objs) {
                 URL url = qiniuOSSClient.generatePresignedUrl(bkt, o.getKey(), expr);
                 println(url.toString());
@@ -347,6 +370,7 @@ public class QiniuOSSTest {
                 println("deleteBucket: " + bkt.getName());
                 try {
                     qiniuOSSClient.deleteBucket(bkt.getName());
+                    println("\tdeleteBucket successed: " + bkt.getName());
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -372,6 +396,10 @@ public class QiniuOSSTest {
 
     private static void println(Object obj) {
         System.out.println(obj);
+    }
+
+    private static void print(Object obj) {
+        System.out.print(obj);
     }
 
     public static File createSampleFile(String fileName, long size) throws IOException {

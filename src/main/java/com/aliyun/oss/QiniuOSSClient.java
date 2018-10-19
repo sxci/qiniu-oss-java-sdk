@@ -405,7 +405,7 @@ public class QiniuOSSClient implements OSS {
     @Override
     public ObjectListing listObjects(ListObjectsRequest p) throws OSSException, ClientException {
         try {
-            int max = p.getMaxKeys() == null ? 0 : p.getMaxKeys().intValue();
+            int max = p.getMaxKeys() == null ? 200 : p.getMaxKeys().intValue();
             FileListing files = getBucketManager().listFiles(p.getBucketName(), p.getPrefix(),
                     p.getMarker(), max, p.getDelimiter());
             ObjectListing objs = new ObjectListing();
