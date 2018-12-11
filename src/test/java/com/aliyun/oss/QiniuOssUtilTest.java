@@ -127,7 +127,7 @@ public class QiniuOssUtilTest {
                 "SLF4J: Defaulting to no-operation (NOP) logger implementation\n" +
                 "SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.\n" +
                 "/var/folders/ld/0_5wyyz96dx4rnq6j3d3p5h40000gn/T/qiniu_7260501609310137976tmp\n";
-        String object = "qiniu_oss_test_26050160283jfr393101379";
+        String object = "qiniu_oss_test无锡_26/05016/0283jfr393101379";
         String mimetype = "my/mime-type";
         // 没有用到 expire 、 maxage
         String url1 = qiniuOssUtil.uploadContent(bucket, object, content, mimetype, null, null);
@@ -151,7 +151,7 @@ public class QiniuOssUtilTest {
     @Test
     public void testUploadFile() throws IOException {
         File f = createFile(34529);
-        String object = "qiniu_oss_test_26050160283jfr393101379";
+        String object = "qiniu_oss_test_260/来个中文/50160283jfr393101379";
         String mimetype = "my/mime-type";
         // 没有用到 expire 、 maxage
         qiniuOssUtil.uploadFile(bucket, object, f.getAbsolutePath(), mimetype, null, null, null);
