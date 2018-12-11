@@ -38,21 +38,23 @@ public class QiniuOSSTest {
 
         String testAccessKey = System.getenv("QINIU_ACCESS_KEY");
         String testSecretKey = System.getenv("QINIU_SECRET_KEY");
+        String host = "";
         println(testAccessKey);
 
-        qiniuOSSClient = new QiniuOSSClient(testAccessKey, testSecretKey, config);
+        qiniuOSSClient = new QiniuOSSClient(testAccessKey, testSecretKey, host,  config);
     }
 
 
     private void initPublic() {
         String testAccessKey = System.getenv("QINIU_ACCESS_KEY");
         String testSecretKey = System.getenv("QINIU_SECRET_KEY");
+        String host = "";
         println(testAccessKey);
 
         Configuration config = new Configuration(Zone.zone0());
         config.useHttpsDomains = false; // 使用 http ，方便必要时 http 抓包查看请求响应信息
 
-        qiniuOSSClient = new QiniuOSSClient(testAccessKey, testSecretKey, config);
+        qiniuOSSClient = new QiniuOSSClient(testAccessKey, testSecretKey, host, config);
     }
 
     @Before

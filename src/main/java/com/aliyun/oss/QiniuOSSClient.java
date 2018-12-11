@@ -66,14 +66,17 @@ public class QiniuOSSClient implements OSS {
     private Configuration config;
     private BucketManager _bucketManager;
     private UploadManager _uploadManager;
+    // 空间绑定的域名
+    private String host;
 
-    public QiniuOSSClient(String accessKeyId, String secretAccessKey, Configuration config) {
+    public QiniuOSSClient(String accessKeyId, String secretAccessKey, String host, Configuration config) {
         if (config.zone == null || config.zone instanceof AutoZone ||
                 config.zone.getRegion() == null || config.zone.getRegion().length() == 0) {
             throw new IllegalArgumentException("region must be set-up or not a fix zone");
         }
         this.auth = Auth.create(accessKeyId, secretAccessKey);
         this.config = config;
+        this.host = host;
     }
 
 
@@ -216,6 +219,7 @@ public class QiniuOSSClient implements OSS {
             Response res = getBucketManager().batch(opt);
             DeleteObjectsResult ret = new DeleteObjectsResult();
             // TODO 组装响应结果 // 不要求实现，只实现了删除功能，没有组装响应结果
+            res.close();
             return ret;
         } catch (QiniuException e) {
             throwAliException(e);
@@ -224,6 +228,7 @@ public class QiniuOSSClient implements OSS {
 //        // 不要求实现，需要的话，可以考虑 batch 删除
 //        throw new UnsupportedOperationException(unsupportedMsg);
     }
+
 
 
     @Override
@@ -240,7 +245,26 @@ public class QiniuOSSClient implements OSS {
         throw new UnsupportedOperationException(unsupportedMsg);
     }
 
-    @Override
+
+    public PutObjectResult putObject(String bucketName, String key, byte[] content) {
+        String token = auth.uploadToken(bucketName, key);
+        try {
+            Response res = getUploadManager().put(content, key, token);
+            PutObjectResult objres = new PutObjectResult();
+            Map<String, String> putRet = res.jsonToObject(Map.class);
+            objres.setETag(putRet.get("hash")); //TODO 是 文件 hash ，还是响应头信息
+            objres.setCallbackResponseBody(res.bodyStream());
+            objres.setRequestId(res.reqId);
+
+            res.close();
+            return objres;
+        } catch (QiniuException e) {
+            throwAliException(e);
+        }
+        return null;
+    }
+
+     @Override
     public PutObjectResult putObject(String bucketName, String key, File file, ObjectMetadata metadata)
             throws OSSException, ClientException {
         String token = auth.uploadToken(bucketName, key);
@@ -257,6 +281,7 @@ public class QiniuOSSClient implements OSS {
 //            objres.setClientCRC();
 //            objres.setResponse(); //TODO 不设置会有什么影响
 
+            res.close();
             return objres;
         } catch (QiniuException e) {
             throwAliException(e);
@@ -308,20 +333,10 @@ public class QiniuOSSClient implements OSS {
 
     @Override
     public OSSObject getObject(String bucketName, String key) throws OSSException, ClientException {
-        String domain = getHttpDomain(bucketName);
-
-        String url = "http://" + domain + "/" + HttpUtil.urlEncode(key, "UTF-8");
-        String signedUrl = auth.privateDownloadUrl(url, 3600 * 3);
-
-        String iovipHttp = config.zone.getIovipHttp(null);
-        int s = iovipHttp.indexOf("://");
-        s = s == -1 ? 0 : s + 3;
-        String iovipHttpHost = iovipHttp.substring(s);
-        signedUrl = signedUrl.replaceFirst(domain, iovipHttpHost);
+        String url = genUrlWithToken(bucketName, key);
 
         Request request = new Request.Builder()
-                .url(signedUrl)
-                .addHeader("Host", domain)
+                .url(url)
                 .addHeader("User-Agent", VersionInfoUtils.getDefaultUserAgent())
                 .build();
 
@@ -333,12 +348,8 @@ public class QiniuOSSClient implements OSS {
                 String rawResponseError = new String(b);
                 res.close();
 
-                if (res.code() == 404 && rawResponseError.indexOf("\"no such domain\"") != -1) {
-                    removeHttpDomainCache(bucketName);
-                }
-
                 throw new OSSException(res.message(), res.code() + "", res.header("X-Reqid"),
-                        domain, null, null, "GET", rawResponseError);
+                        url, null, null, "GET", rawResponseError);
             }
             OSSObject obj = new OSSObject();
             obj.setBucketName(bucketName);
@@ -346,6 +357,7 @@ public class QiniuOSSClient implements OSS {
             obj.setObjectMetadata(new ObjectMetadata()); // TODO ObjectMetadata  怎么获取？应该是什么数据
             obj.setObjectContent(res.body().byteStream());
 
+            res.close();
             return obj;
         } catch (IOException e) {
             throw new OSSException(e.getMessage(), e);
@@ -449,16 +461,7 @@ public class QiniuOSSClient implements OSS {
 
     @Override
     public URL generatePresignedUrl(String bucketName, String key, Date expiration) throws ClientException {
-        String domain = "";
-        try {
-            String[] domains = getBucketManager().domainList(bucketName);
-            domain = domains[0];
-        } catch (QiniuException e) {
-            throwAliException(e);
-        } catch (Exception e) {
-            throw new ClientException("no domain on the bucket " + bucketName, e);
-        }
-        String url = "http://" + domain + "/" + HttpUtil.urlEncode(key, "UTF-8");
+        String url = "http://" + host + "/" + HttpUtil.urlEncode(key, "UTF-8");
         String signedUrl = auth.privateDownloadUrlWithDeadline(url, expiration.getTime() / 1000);
         try {
             return new URL(signedUrl);
@@ -703,16 +706,27 @@ public class QiniuOSSClient implements OSS {
         throw new UnsupportedOperationException(unsupportedMsg);
     }
 
+    /**
+     * qiniu stat interface
+     * */
     @Override
     public ObjectMetadata getObjectMetadata(String bucketName, String key) throws OSSException, ClientException {
-        // 不要求实现
-        throw new UnsupportedOperationException(unsupportedMsg);
+        FileInfo info = null;
+        try{
+            info = getBucketManager().stat(bucketName, key);
+        } catch (QiniuException e) {
+            throwAliException(e);
+        }
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentType(info.mimeType);
+        metadata.setContentLength(info.fsize);
+        metadata.setLastModified(new Date(info.putTime/10000));
+        return metadata;
     }
 
     @Override
     public ObjectMetadata getObjectMetadata(GenericRequest genericRequest) throws OSSException, ClientException {
-        // 不要求实现
-        throw new UnsupportedOperationException(unsupportedMsg);
+        return getObjectMetadata(genericRequest.getBucketName(), genericRequest.getKey());
     }
 
 
@@ -1368,7 +1382,8 @@ public class QiniuOSSClient implements OSS {
             throw new IllegalArgumentException("creds should not be null.");
         }
         auth = Auth.create(creds.getAccessKeyId(), creds.getSecretAccessKey());
-        _bucketManager = new BucketManager(auth, config);
+        _bucketManager = null;
+        _uploadManager = null;
         this.credsProvider.setCredentials(creds);
 //        throw new UnsupportedOperationException(unsupportedMsg);
     }
@@ -1392,6 +1407,25 @@ public class QiniuOSSClient implements OSS {
 
 
     //////////////
+
+    /** 实际使用中，bucket 和 host 一直不变，不需要动态去获取不同空间的不同域名， */
+    private String genUrl(String bucket, String object) {
+        return getHost() + "/" + HttpUtil.urlEncode(object, "UTF-8");
+    }
+
+    private String genUrlWithToken(String bucket, String object) {
+        String ourl = genUrl(bucket, object);
+        String url = auth.privateDownloadUrl(ourl);
+        return url;
+    }
+
+    private String getHost() {
+        if (host.startsWith("http://") || host.startsWith("https://")) {
+            return host;
+        } else {
+            return "http://" + host;
+        }
+    }
 
     private BucketManager getBucketManager() {
         if (_bucketManager == null) {
@@ -1476,64 +1510,6 @@ public class QiniuOSSClient implements OSS {
             }
         }
         return _client;
-    }
-
-    private DomainCache domainCache = new DomainCache();
-
-    private String getHttpDomain(String bucketName) {
-        Host host = domainCache.get(bucketName);
-        if (host != null && System.currentTimeMillis() / 1000 < host.create + 60 * 10) {
-            return host.host;
-        }
-        if (host != null) {
-            domainCache.remove(bucketName);
-        }
-        String[] domains = {};
-        try {
-            domains = getBucketManager().domainList(bucketName);
-        } catch (QiniuException e) {
-            throwAliException(e);
-        }
-        String domain = "";
-        try {
-            domain = domains[0];
-        } catch (Exception e) {
-            throw new ClientException("do not have domain from Qiniu");
-        }
-        domainCache.put(bucketName, new Host(domain));
-        return domain;
-    }
-
-    private void removeHttpDomainCache(String bucketName) {
-        domainCache.remove(bucketName);
-    }
-
-    class Host {
-        String host;
-        long create;
-
-        Host(String host) {
-            this.host = host;
-            this.create = System.currentTimeMillis() / 1000;
-        }
-    }
-
-    class DomainCache extends LinkedHashMap<String, Host> {
-        private int limit;
-
-        public DomainCache() {
-            this(256);
-        }
-
-        public DomainCache(int limit) {
-            super(limit, 1.0f, true);
-            this.limit = limit;
-        }
-
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, Host> eldest) {
-            return this.size() > this.limit;
-        }
     }
 
 }
